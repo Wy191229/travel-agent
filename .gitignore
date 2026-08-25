@@ -1,0 +1,26 @@
+.venv/
+__pycache__/
+*.pyc
+
+.env
+*.log
+
+memory.db
+docker_data/
+rag_data/
+eval/reports/
+
+.DS_Store
+# local backup files
+*.bak
+*.backup
+*.bad
+*.save
+*.before_*
+*.broken_*
+app.py.*
+memory.py.before_*
+rag.py.before_*
+README.md.before_*
+eval/*.before_*
+badcases_*.md

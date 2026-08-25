@@ -1,0 +1,13 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+memory.db
+docker_data
+eval/reports
+*.bak
+app.py.before*
+app.py.bad*
+.git
