@@ -1,23 +1,16 @@
-name: Agent Eval
+﻿name: Lightweight CI
 
 on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  agent-eval:
+  code-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    env:
-      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-      LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
-      LLM_MODEL: ${{ secrets.LLM_MODEL }}
-      EMBEDDING_MODEL: ${{ secrets.EMBEDDING_MODEL }}
-      EMBEDDING_DIMENSIONS: ${{ secrets.EMBEDDING_DIMENSIONS }}
-      AMAP_API_KEY: ${{ secrets.AMAP_API_KEY }}
-      APP_API_KEY: ${{ secrets.APP_API_KEY }}
-      OPENAI_API_KEY: ${{ secrets.LLM_API_KEY }}
-      AGENT_API_BASE: http://127.0.0.1:8000
+    timeout-minutes: 10
 
     steps:
       - name: Checkout repository
@@ -28,22 +21,6 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      - name: Validate required secrets
-        run: |
-          test -n "$LLM_API_KEY" || (echo "LLM_API_KEY is missing" && exit 1)
-          test -n "$LLM_BASE_URL" || (echo "LLM_BASE_URL is missing" && exit 1)
-          test -n "$LLM_MODEL" || (echo "LLM_MODEL is missing" && exit 1)
-          test -n "$EMBEDDING_MODEL" || (echo "EMBEDDING_MODEL is missing" && exit 1)
-          test -n "$EMBEDDING_DIMENSIONS" || (echo "EMBEDDING_DIMENSIONS is missing" && exit 1)
-          test -n "$AMAP_API_KEY" || (echo "AMAP_API_KEY is missing" && exit 1)
-          test -n "$APP_API_KEY" || (echo "APP_API_KEY is missing" && exit 1)
-          echo "Required secrets are configured"
-
       - name: Compile check
         run: |
           python -m py_compile app.py
@@ -52,32 +29,50 @@ jobs:
           python -m py_compile observability.py
           python -m py_compile eval/run_eval.py
 
-      - name: Start FastAPI service
+      - name: Validate eval cases
         run: |
-          python -m uvicorn app:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+          python - <<'PY'
+          import json
+          from pathlib import Path
 
-          for i in {1..20}; do
-            if curl -s http://127.0.0.1:8000/health; then
-              echo "FastAPI started successfully"
-              exit 0
-            fi
-            echo "Waiting for FastAPI... $i"
-            sleep 2
-          done
+          path = Path("eval/cases.jsonl")
+          if not path.exists():
+              raise SystemExit("eval/cases.jsonl is missing")
 
-          echo "FastAPI failed to start. server.log:"
-          cat server.log
-          exit 1
+          count = 0
+          with path.open("r", encoding="utf-8") as f:
+              for line_no, line in enumerate(f, 1):
+                  line = line.strip()
+                  if not line:
+                      continue
+                  try:
+                      case = json.loads(line)
+                  except json.JSONDecodeError as exc:
+                      raise SystemExit(f"Invalid JSON at line {line_no}: {exc}") from exc
 
-      - name: Run agent eval
+                  for field in ("id", "category", "message"):
+                      if field not in case:
+                          raise SystemExit(f"Missing field {field!r} at line {line_no}")
+                  count += 1
+
+          print(f"Validated {count} eval cases")
+          PY
+
+      - name: Repository hygiene check
         run: |
-          python eval/run_eval.py
+          test ! -f .env || (echo ".env must not be committed" && exit 1)
 
-      - name: Upload eval reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: eval-reports
-          path: |
-            eval/reports/
-            server.log
+          db_files=$(find . -path ./.git -prune -o \( -name "*.db" -o -name "*.sqlite" -o -name "*.sqlite3" \) -print)
+          if [ -n "$db_files" ]; then
+            echo "Database files must not be committed:"
+            echo "$db_files"
+            exit 1
+          fi
+
+          if [ -d eval/reports ] && find eval/reports -type f | grep -q .; then
+            echo "eval/reports generated files must not be committed"
+            find eval/reports -type f
+            exit 1
+          fi
+
+          echo "Repository hygiene check passed"

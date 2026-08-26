@@ -1,0 +1,83 @@
+name: Agent Eval
+
+on:
+  workflow_dispatch:
+
+jobs:
+  agent-eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+      LLM_MODEL: ${{ secrets.LLM_MODEL }}
+      EMBEDDING_MODEL: ${{ secrets.EMBEDDING_MODEL }}
+      EMBEDDING_DIMENSIONS: ${{ secrets.EMBEDDING_DIMENSIONS }}
+      AMAP_API_KEY: ${{ secrets.AMAP_API_KEY }}
+      APP_API_KEY: ${{ secrets.APP_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.LLM_API_KEY }}
+      AGENT_API_BASE: http://127.0.0.1:8000
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Validate required secrets
+        run: |
+          test -n "$LLM_API_KEY" || (echo "LLM_API_KEY is missing" && exit 1)
+          test -n "$LLM_BASE_URL" || (echo "LLM_BASE_URL is missing" && exit 1)
+          test -n "$LLM_MODEL" || (echo "LLM_MODEL is missing" && exit 1)
+          test -n "$EMBEDDING_MODEL" || (echo "EMBEDDING_MODEL is missing" && exit 1)
+          test -n "$EMBEDDING_DIMENSIONS" || (echo "EMBEDDING_DIMENSIONS is missing" && exit 1)
+          test -n "$AMAP_API_KEY" || (echo "AMAP_API_KEY is missing" && exit 1)
+          test -n "$APP_API_KEY" || (echo "APP_API_KEY is missing" && exit 1)
+          echo "Required secrets are configured"
+
+      - name: Compile check
+        run: |
+          python -m py_compile app.py
+          python -m py_compile rag.py
+          python -m py_compile memory.py
+          python -m py_compile observability.py
+          python -m py_compile eval/run_eval.py
+
+      - name: Start FastAPI service
+        run: |
+          python -m uvicorn app:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+
+          for i in {1..20}; do
+            if curl -s http://127.0.0.1:8000/health; then
+              echo "FastAPI started successfully"
+              exit 0
+            fi
+            echo "Waiting for FastAPI... $i"
+            sleep 2
+          done
+
+          echo "FastAPI failed to start. server.log:"
+          cat server.log
+          exit 1
+
+      - name: Run agent eval
+        run: |
+          python eval/run_eval.py
+
+      - name: Upload eval reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-reports
+          path: |
+            eval/reports/
+            server.log
