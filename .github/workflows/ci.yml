@@ -6,6 +6,16 @@ on:
 jobs:
   agent-eval:
     runs-on: ubuntu-latest
+    env:
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+      LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
+      LLM_MODEL: ${{ secrets.LLM_MODEL }}
+      EMBEDDING_MODEL: ${{ secrets.EMBEDDING_MODEL }}
+      EMBEDDING_DIMENSIONS: ${{ secrets.EMBEDDING_DIMENSIONS }}
+      AMAP_API_KEY: ${{ secrets.AMAP_API_KEY }}
+      APP_API_KEY: ${{ secrets.APP_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.LLM_API_KEY }}
+
     timeout-minutes: 30
 
     env:
