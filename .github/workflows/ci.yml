@@ -42,9 +42,20 @@ jobs:
 
       - name: Start FastAPI service
         run: |
-          uvicorn app:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
-          sleep 8
-          curl http://127.0.0.1:8000/health
+          python -m uvicorn app:app --host 127.0.0.1 --port 8000 > server.log 2>&1 &
+
+          for i in {1..20}; do
+            if curl -s http://127.0.0.1:8000/health; then
+              echo "FastAPI started successfully"
+              exit 0
+            fi
+            echo "Waiting for FastAPI... $i"
+            sleep 2
+          done
+
+          echo "FastAPI failed to start. server.log:"
+          cat server.log
+          exit 1
 
       - name: Run agent eval
         run: |
