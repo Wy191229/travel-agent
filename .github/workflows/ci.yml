@@ -6,7 +6,9 @@ on:
 jobs:
   agent-eval:
     runs-on: ubuntu-latest
-    env:
+    timeout-minutes: 30
+
+  env:
       LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
       LLM_BASE_URL: ${{ secrets.LLM_BASE_URL }}
       LLM_MODEL: ${{ secrets.LLM_MODEL }}
@@ -15,9 +17,7 @@ jobs:
       AMAP_API_KEY: ${{ secrets.AMAP_API_KEY }}
       APP_API_KEY: ${{ secrets.APP_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.LLM_API_KEY }}
-
-    timeout-minutes: 30
-
+      AGENT_API_BASE: http://127.0.0.1:8000
 
     steps:
       - name: Checkout repository
