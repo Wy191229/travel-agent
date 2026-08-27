@@ -9,7 +9,7 @@ if [ -f ".env" ]; then
   set +a
 fi
 
-API_KEY="${AGENT_API_KEY:-${API_KEY:-}}"
+API_KEY="${AGENT_API_KEY:-${APP_API_KEY:-${API_KEY:-}}}"
 
 if [ -z "$API_KEY" ]; then
   echo "ERROR: API key not found. Set AGENT_API_KEY or API_KEY in .env"

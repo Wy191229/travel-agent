@@ -62,6 +62,15 @@ class ClearSessionRequest(BaseModel):
 session_memory = {}
 MAX_MEMORY_MESSAGES = 8
 
+
+def get_service_api_key() -> str:
+    return (
+        os.getenv("AGENT_API_KEY")
+        or os.getenv("APP_API_KEY")
+        or os.getenv("API_KEY")
+        or ""
+    )
+
 SYSTEM_PROMPT = """
 你是一个智能旅行助手。
 
@@ -777,7 +786,7 @@ def health():
 
 @app.get("/admin/stats")
 def admin_stats(x_api_key: str = Header(default="")):
-    expected_key = os.getenv("AGENT_API_KEY", "")
+    expected_key = get_service_api_key()
     if expected_key and x_api_key != expected_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
     return build_stats_snapshot()
@@ -882,7 +891,7 @@ def build_message_with_rag_context(message: str, trace_id: str):
 @app.post("/chat")
 def chat(req: ChatRequest, x_api_key: str = Header(default="")):
     trace_id = uuid.uuid4().hex[:12]
-    expected_key = os.getenv("AGENT_API_KEY", "")
+    expected_key = get_service_api_key()
     if expected_key and x_api_key != expected_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
@@ -913,7 +922,8 @@ def chat(req: ChatRequest, x_api_key: str = Header(default="")):
         }
 @app.post("/clear_session")
 def clear_session(req: ClearSessionRequest, x_api_key: str = Header(default="")):
-    if x_api_key != os.getenv("AGENT_API_KEY"):
+    expected_key = get_service_api_key()
+    if expected_key and x_api_key != expected_key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     memory_store.clear_session(req.session_id)

@@ -28,6 +28,7 @@ jobs:
           python -m py_compile memory.py
           python -m py_compile observability.py
           python -m py_compile eval/run_eval.py
+          python -m py_compile scripts/load-test.py
 
       - name: Validate eval cases
         run: |

@@ -16,6 +16,7 @@ jobs:
       EMBEDDING_DIMENSIONS: ${{ secrets.EMBEDDING_DIMENSIONS }}
       AMAP_API_KEY: ${{ secrets.AMAP_API_KEY }}
       APP_API_KEY: ${{ secrets.APP_API_KEY }}
+      AGENT_API_KEY: ${{ secrets.AGENT_API_KEY || secrets.APP_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.LLM_API_KEY }}
       AGENT_API_BASE: http://127.0.0.1:8000
 
@@ -41,7 +42,7 @@ jobs:
           test -n "$EMBEDDING_MODEL" || (echo "EMBEDDING_MODEL is missing" && exit 1)
           test -n "$EMBEDDING_DIMENSIONS" || (echo "EMBEDDING_DIMENSIONS is missing" && exit 1)
           test -n "$AMAP_API_KEY" || (echo "AMAP_API_KEY is missing" && exit 1)
-          test -n "$APP_API_KEY" || (echo "APP_API_KEY is missing" && exit 1)
+          test -n "$AGENT_API_KEY" || test -n "$APP_API_KEY" || (echo "AGENT_API_KEY or APP_API_KEY is missing" && exit 1)
           echo "Required secrets are configured"
 
       - name: Compile check
@@ -51,6 +52,7 @@ jobs:
           python -m py_compile memory.py
           python -m py_compile observability.py
           python -m py_compile eval/run_eval.py
+          python -m py_compile scripts/load-test.py
 
       - name: Start FastAPI service
         run: |

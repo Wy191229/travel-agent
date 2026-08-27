@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BASE_URL = os.getenv("AGENT_BASE_URL", "http://127.0.0.1")
-API_KEY = os.getenv("AGENT_API_KEY")
+API_KEY = os.getenv("AGENT_API_KEY") or os.getenv("APP_API_KEY") or os.getenv("API_KEY")
 
 if not API_KEY:
     print("FAIL: .env 中没有 AGENT_API_KEY")

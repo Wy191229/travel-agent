@@ -35,7 +35,12 @@ def clear_eval_session(session_id):
         print(f"  WARN clear_session failed session_id={session_id}: {exc}")
 
 
-API_KEY = os.getenv("AGENT_API_KEY", "travel-agent-2026-9f3a7c2d8e1b6k4m")
+API_KEY = (
+    os.getenv("AGENT_API_KEY")
+    or os.getenv("APP_API_KEY")
+    or os.getenv("API_KEY")
+    or ""
+)
 TIMEOUT = int(os.getenv("EVAL_TIMEOUT", "120"))
 
 BASE_DIR = Path(__file__).resolve().parent

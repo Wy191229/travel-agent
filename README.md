@@ -79,6 +79,7 @@ flowchart TD
 - Markdown 知识库
 - curl smoke test
 - 自定义 eval 回归评测
+- 并发压测与边界输入测试
 
 ## 5. 项目目录说明
 
@@ -105,7 +106,8 @@ flowchart TD
 │   ├── cases.jsonl                # 评测用例
 │   └── reports/                   # 评测报告与 badcase
 └── scripts/
-    └── docker-smoke-test.sh       # smoke test 脚本
+    ├── docker-smoke-test.sh       # smoke test 脚本
+    └── load-test.py               # 并发压测与边界输入测试脚本
 ```
 
 ## 6. 环境变量
@@ -126,6 +128,7 @@ AMAP_API_KEY=你的高德API Key
 
 API_KEY=你的服务访问密钥
 AGENT_API_KEY=你的服务访问密钥
+APP_API_KEY=你的服务访问密钥
 ```
 
 说明：
@@ -136,7 +139,7 @@ AGENT_API_KEY=你的服务访问密钥
 - `EMBEDDING_MODEL`：RAG 向量化模型。
 - `EMBEDDING_DIMENSIONS`：Embedding 向量维度。
 - `AMAP_API_KEY`：高德开放平台 Key。
-- `API_KEY` / `AGENT_API_KEY`：服务接口鉴权密钥。
+- `API_KEY` / `AGENT_API_KEY` / `APP_API_KEY`：服务接口鉴权密钥，三者用于兼容不同部署和 CI 环境，建议生产环境统一使用 `AGENT_API_KEY`。
 
 注意：`.env` 不能提交到 Git 仓库。
 
@@ -408,6 +411,84 @@ eval/reports/baseline_eval_docker_v1.json
 eval/reports/baseline_badcases_docker_v1.md
 ```
 
+### 12.1 并发压测与边界输入测试
+
+项目提供轻量压测脚本：
+
+```bash
+scripts/load-test.py
+```
+
+脚本会检查：
+
+- `/health` 是否正常。
+- `/chat` 在并发请求下是否稳定返回。
+- 缺少起点、缺少目的地、非法地点等边界输入是否能兜底。
+- Prompt Injection 输入是否不会泄露密钥或内部变量名。
+- 长输入是否不会导致服务 500 或长时间无响应。
+- `/admin/stats` 是否能返回运行统计。
+
+测试默认值：
+
+```text
+concurrency: 5
+requests: 10
+long_size: 600
+timeout: 120s
+max_failure_rate: 0.2
+```
+
+测试 Docker / Nginx 正式入口：
+
+```bash
+AGENT_API_BASE=http://127.0.0.1 AGENT_API_KEY=你的服务访问密钥 python3 scripts/load-test.py
+```
+
+测试 Docker 旁路端口：
+
+```bash
+AGENT_API_BASE=http://127.0.0.1:8001 AGENT_API_KEY=你的服务访问密钥 python3 scripts/load-test.py
+```
+
+提高并发强度：
+
+```bash
+AGENT_API_BASE=http://127.0.0.1 AGENT_API_KEY=你的服务访问密钥 \
+python3 scripts/load-test.py --concurrency 10 --requests 20
+```
+
+只跑边界输入测试：
+
+```bash
+AGENT_API_BASE=http://127.0.0.1 AGENT_API_KEY=你的服务访问密钥 \
+python3 scripts/load-test.py --skip-load
+```
+
+只跑并发压测：
+
+```bash
+AGENT_API_BASE=http://127.0.0.1 AGENT_API_KEY=你的服务访问密钥 \
+python3 scripts/load-test.py --skip-boundary
+```
+
+脚本会输出：
+
+- 总请求数
+- 成功数 / 失败数
+- 成功率
+- 平均延迟
+- p95 延迟
+- 最大延迟
+- 失败原因
+
+同时会生成报告：
+
+```text
+eval/reports/load_test_report_时间戳.json
+```
+
+该目录已加入 `.gitignore`，测试报告不会被误提交。
+
 ## 13. RAG 说明
 
 RAG 知识库目录：
@@ -546,6 +627,7 @@ pass_rate: 1.0
 - 使用 `/admin/stats` 统计请求量、成功率、工具调用次数和延迟。
 - 使用 Docker Compose 实现可复现部署。
 - 使用 smoke test 和 eval 回归评测形成上线前验收闭环。
+- 使用并发压测和边界输入测试验证多用户请求、异常输入和长输入场景下的稳定性。
 - Docker 版和 systemd 版可以并行运行，降低部署切换风险。
 
 ## 18. 后续优化方向
@@ -554,7 +636,7 @@ pass_rate: 1.0
 - 将 Markdown 攻略升级为结构化 JSON / YAML。
 - 引入更专业的向量数据库，如 FAISS、Milvus、Qdrant 或 pgvector。
 - 增加 Rerank，提高 RAG 检索质量。
-- 增加并发压测和长输入边界测试。
+- 扩大并发压测规模，补充更多真实用户长尾输入。
 - 将 `/admin/stats` 接入 Prometheus / Grafana。
 - 增加 HTTPS 和域名。
 - 将 Docker 旁路版切换为正式服务。
